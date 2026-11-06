@@ -1,0 +1,31 @@
+# FastAPI framework for building REST APIs
+fastapi>=0.115.0
+
+# ASGI server to run FastAPI applications
+uvicorn[standard]>=0.30.0
+
+# SQL toolkit and Object-Relational Mapping (ORM) library
+sqlalchemy>=2.0.0
+
+# Pure Python MySQL client driver
+pymysql>=1.1.0
+
+# Cryptography library (prebuilt wheel for Windows ARM64 required by PyMySQL for MySQL 8+ authentication)
+cryptography==46.0.3
+
+# Reads key-value pairs from .env and sets them as environment variables
+python-dotenv>=1.0.0
+
+# Data validation and settings management using Python type annotations
+pydantic>=2.8.0
+
+# Validates email address format in Pydantic models
+email-validator>=2.2.0
+
+# Password hashing utilities (compatible with Python 3.13)
+bcrypt>=4.0.0
+passlib[bcrypt]>=1.7.4
+
+# JSON Web Token (JWT) for secure signed authentication tokens
+pyjwt>=2.9.0
+

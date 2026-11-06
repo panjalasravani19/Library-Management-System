@@ -1,0 +1,24 @@
+# Python virtual environment
+venv/
+backend/venv/
+
+# Environment variables & secrets (NEVER commit passwords to Git)
+.env
+backend/.env
+
+# Node.js & Frontend build
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+
+# Byte-compiled / optimized files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
