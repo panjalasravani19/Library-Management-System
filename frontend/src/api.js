@@ -4,7 +4,8 @@
  * Handles JWT Bearer token authentication for both Administrator and Student sessions.
  */
 
-const API_BASE_URL = 'http://127.0.0.1:8000';
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
 
 // Store token in memory and synchronize with localStorage
 let authToken =
@@ -42,8 +43,8 @@ async function request(endpoint, options = {}) {
   } catch (error) {
     if (error.name === 'TypeError' && error.message.includes('fetch')) {
       throw new Error(
-        'Unable to connect to the backend server. Please make sure FastAPI is running at http://127.0.0.1:8000.'
-      );
+  'Unable to connect to the backend server. Please check your internet connection or try again later.'
+);
     }
     throw error;
   }
