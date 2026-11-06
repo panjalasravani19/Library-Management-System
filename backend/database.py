@@ -1,110 +1,108 @@
+
 """
-Database configuration and session management for the Library Management System.
-This file connects FastAPI to MySQL using SQLAlchemy and PyMySQL.
+Database configuration and session management.
+Supports local MySQL and hosted Aiven MySQL.
 """
 
 import os
+from pathlib import Path
 from urllib.parse import quote_plus
+
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-# ---------------------------------------------------------------------------
-# 1. Load Environment Variables
-# ---------------------------------------------------------------------------
-# Locate the .env file in the backend directory
-base_dir = os.path.dirname(os.path.abspath(__file__))
-env_path = os.path.join(base_dir, ".env")
+# Load backend/.env
+BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR / ".env")
 
-# Load variables from .env into os.environ
-load_dotenv(dotenv_path=env_path)
-
-# Retrieve database connection settings
+# Database settings
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = os.getenv("DB_PORT", "3306")
 DB_USER = os.getenv("DB_USER", "root")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 DB_NAME = os.getenv("DB_NAME", "library_db")
 
-# ---------------------------------------------------------------------------
-# 2. Build Database URL
-# ---------------------------------------------------------------------------
-# Use quote_plus so passwords with special characters (e.g. @, #, $, %) don't break the connection URL
-encoded_password = quote_plus(DB_PASSWORD) if DB_PASSWORD else ""
+# Optional SSL certificate for Aiven
+DB_SSL_CA = os.getenv("DB_SSL_CA", "").strip()
 
-# Format: mysql+pymysql://<username>:<password>@<host>:<port>/<database_name>
-DATABASE_URL = f"mysql+pymysql://{DB_USER}:{encoded_password}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+# Build database URL
+encoded_user = quote_plus(DB_USER)
+encoded_password = quote_plus(DB_PASSWORD)
 
-# ---------------------------------------------------------------------------
-# 3. Create SQLAlchemy Engine
-# ---------------------------------------------------------------------------
-# The engine is the central connection point to the MySQL database.
-# pool_pre_ping=True checks connections before using them to prevent stale connections.
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+DATABASE_URL = (
+    f"mysql+pymysql://{encoded_user}:{encoded_password}"
+    f"@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+)
 
-# ---------------------------------------------------------------------------
-# 4. Create SessionLocal Class
-# ---------------------------------------------------------------------------
-# Each instance of SessionLocal is an active database conversation/transaction.
-# autocommit=False ensures transactions are explicitly committed when safe.
-# autoflush=False prevents automatic premature flushes before commit.
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# Configure SSL only when a CA certificate is provided
+connect_args = {}
 
-# ---------------------------------------------------------------------------
-# 5. Base Class for ORM Models
-# ---------------------------------------------------------------------------
-# Models in models.py will inherit from this Base class to create tables.
+if DB_SSL_CA:
+    ca_path = Path(DB_SSL_CA)
+
+    if not ca_path.is_absolute():
+        ca_path = BASE_DIR / ca_path
+
+    if not ca_path.is_file():
+        raise FileNotFoundError(
+            f"MySQL SSL CA certificate not found: {ca_path}"
+        )
+
+    connect_args["ssl"] = {"ca": str(ca_path)}
+
+# Create SQLAlchemy engine
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+    pool_recycle=300,
+    connect_args=connect_args,
+)
+
+# Database sessions
+SessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine,
+)
+
 Base = declarative_base()
 
-# ---------------------------------------------------------------------------
-# 6. Database Session Dependency for FastAPI
-# ---------------------------------------------------------------------------
+
 def get_db():
-    """
-    FastAPI dependency function.
-    Opens a new database session for a single request, yields it to the route,
-    and guarantees the session is closed when the request finishes.
-    """
+    """Provide a database session to FastAPI routes."""
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
 
-# ---------------------------------------------------------------------------
-# 7. Database Connection Test Helper
-# ---------------------------------------------------------------------------
+
 def test_connection():
-    """
-    Helper function to verify if MySQL is running and accessible
-    using the credentials defined in the .env file.
-    """
-    print("Testing connection to MySQL database...")
-    print(f"- Host: {DB_HOST}")
-    print(f"- Port: {DB_PORT}")
-    print(f"- User: {DB_USER}")
-    print(f"- Database: {DB_NAME}")
+    """Test the configured MySQL connection."""
+    print("Testing MySQL database connection...")
+    print(f"Host: {DB_HOST}")
+    print(f"Port: {DB_PORT}")
+    print(f"User: {DB_USER}")
+    print(f"Database: {DB_NAME}")
+    print(f"SSL enabled: {bool(DB_SSL_CA)}")
 
     if not DB_PASSWORD:
-        print("\n[WARNING] DB_PASSWORD is empty in backend/.env!")
-        print("Please open backend/.env and enter your MySQL root password.")
+        print("[FAILED] DB_PASSWORD is empty.")
         return False
 
     try:
         with engine.connect() as connection:
-            # Execute a lightweight ping query
-            result = connection.execute(text("SELECT 1"))
-            result.fetchone()
-            print("\n[SUCCESS] Successfully connected to the MySQL database!")
+            result = connection.execute(text("SELECT VERSION()"))
+            print("[SUCCESS] Connected to MySQL!")
+            print("MySQL version:", result.scalar())
             return True
+
     except Exception as error:
-        print("\n[FAILED] Could not connect to MySQL database.")
-        print(f"Error details: {error}")
-        print("\nTroubleshooting tips:")
-        print("1. Ensure MySQL Server is running (in Windows Services or MySQL Workbench).")
-        print("2. Check that the password in backend/.env matches your MySQL password.")
-        print("3. Check that the database exists: CREATE DATABASE library_db;")
+        print("[FAILED] Database connection error:")
+        print(error)
         return False
+
 
 if __name__ == "__main__":
     test_connection()
